@@ -15,7 +15,6 @@ streamlit-folium==0.16.0
 pydeck==0.8.0
 
 # Weather API
-python-weather==0.3.0
 openmeteo-requests==1.0.0
 
 # Additional utilities
