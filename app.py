@@ -6,11 +6,11 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
-from streamlit_folium import st_folium  # ← FIX 1: ADD THIS IMPORT!
+from streamlit_folium import st_folium
 
 from database import DatabaseController
 from nlp_engine import UgandanNLPEngine
-from mock_data import generate_mock_data
+from mock_data import generate_mock_data, generate_search_data
 from map_visualization import UgandaMapVisualizer
 from weather_api import WeatherService
 
@@ -54,15 +54,13 @@ def initialize_engine():
 
 @st.cache_resource
 def initialize_database():
-    """Initialize database with graceful fallback"""
     db = DatabaseController()
     try:
         db.connect()
         db.create_table()
-        st.sidebar.success("✅ Connected to cloud database")
     except Exception as e:
-        st.sidebar.warning("⚠️ Using local CSV fallback")
-        st.sidebar.info("💡 Add DATABASE_URL secret to use cloud storage")
+        st.warning(f"⚠️ Could not connect to cloud database: {str(e)}")
+        st.info("💡 Using local CSV fallback instead.")
     return db
 
 @st.cache_resource
@@ -80,6 +78,14 @@ def load_demo_data():
         insights = generate_mock_data(100)
         result = db.save_insights(insights)
         st.success(f"🐑 Loaded {len(insights)} records with location data!")
+
+def search_brand(brand: str):
+    """Search for a specific brand and generate data"""
+    with st.spinner(f"🔍 Searching for {brand}..."):
+        db = initialize_database()
+        insights = generate_search_data(brand, 20)
+        result = db.save_insights(insights)
+        st.success(f"🐑 Found {len(insights)} mentions of {brand}!")
 
 def main():
     # Header
@@ -110,14 +116,35 @@ def main():
         
         st.divider()
         
+        # SEARCH BRAND
+        st.subheader("🔍 Search Brand")
+        search_query = st.text_input("Enter brand name", placeholder="e.g., MTN Uganda")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔍 Search", use_container_width=True) and search_query:
+                search_brand(search_query)
+        with col2:
+            if st.button("📱 Demo", use_container_width=True):
+                load_demo_data()
+        
+        st.divider()
+        
+        # FILTERS
+        st.subheader("🎯 Filters")
+        
         brand_filter = st.selectbox(
-            "Select Brand",
+            "Brand",
             ["All", "MTN", "Airtel", "Jumia", "SafeBoda", "Yango"]
         )
         
         mood_filter = st.selectbox(
-            "Mood Filter",
+            "Mood",
             ["All", "Happy", "Excited", "Neutral", "Frustrated", "Angry", "Sad"]
+        )
+        
+        platform_filter = st.selectbox(
+            "Platform",
+            ["All", "YouTube", "Twitter", "TikTok", "Reddit", "Instagram"]
         )
         
         days_back = st.slider("Days to display", 1, 30, 7)
@@ -130,9 +157,6 @@ def main():
             st.cache_data.clear()
             st.rerun()
         
-        if st.button("🐑 Load Demo Data", use_container_width=True):
-            load_demo_data()
-        
         st.divider()
         st.caption("🐑 v2.0.0 | Made in Uganda 🇺🇬")
     
@@ -143,6 +167,7 @@ def main():
     # Load data
     df = db.query_insights(
         brand=brand_filter if brand_filter != "All" else None,
+        platform=platform_filter if platform_filter != "All" else None,
         limit=1000
     )
     
@@ -157,7 +182,7 @@ def main():
         df = df[df['mood'] == mood_filter]
     
     # Display metrics
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         st.metric("📊 Total Insights", len(df))
     with col2:
@@ -179,8 +204,28 @@ def main():
             st.metric("✅ Positivity Rate", f"{positive_rate:.1f}%")
         else:
             st.metric("✅ Positivity Rate", "0%")
+    with col5:
+        if not df.empty:
+            platforms = df['platform'].nunique()
+            st.metric("📱 Platforms", platforms)
+        else:
+            st.metric("📱 Platforms", 0)
     
     if not df.empty:
+        # Platform breakdown
+        st.subheader("📱 Platform Traffic")
+        platform_counts = df['platform'].value_counts()
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            fig = px.pie(
+                values=platform_counts.values,
+                names=platform_counts.index,
+                title="Data Source Breakdown"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        with col2:
+            st.bar_chart(platform_counts)
+        
         # Two-column layout for maps
         col1, col2 = st.columns([2, 1])
         
@@ -189,7 +234,7 @@ def main():
             st.caption("Hover over markers for details, colors represent moods")
             
             folium_map = map_visualizer.create_folium_map(df)
-            st_folium(folium_map, width=700, height=500)  # ← NOW WORKS!
+            st_folium(folium_map, width=700, height=500)
         
         with col2:
             st.subheader("📊 Mood Distribution")
@@ -219,6 +264,21 @@ def main():
             fig.update_layout(height=250, margin=dict(t=0, b=0, l=0, r=0))
             st.plotly_chart(fig, use_container_width=True)
         
+        # Sentiment by platform
+        st.subheader("📊 Sentiment by Platform")
+        sentiment_by_platform = df.groupby(['platform', 'sentiment']).size().unstack(fill_value=0)
+        fig = px.bar(
+            sentiment_by_platform,
+            barmode='group',
+            title="Sentiment Distribution by Platform",
+            color_discrete_map={
+                'Positive': '#2ecc71',
+                'Neutral': '#95a5a6',
+                'Negative': '#e74c3c'
+            }
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
         # Advanced map with Plotly
         st.subheader("🗺️ Advanced Sentiment Map")
         plotly_map = map_visualizer.create_plotly_map(df)
@@ -226,25 +286,28 @@ def main():
         
         # Recent insights
         st.subheader("📝 Recent Insights by Location")
-        display_df = df[['timestamp', 'location', 'brand', 'mood', 'sentiment', 'anonymized_text']].head(10)
-        display_df.columns = ['Time', 'Location', 'Brand', 'Mood', 'Sentiment', 'Text']
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        display_cols = ['timestamp', 'location', 'brand', 'mood', 'sentiment', 'platform', 'anonymized_text']
+        if all(col in df.columns for col in display_cols):
+            display_df = df[display_cols].head(10)
+            display_df.columns = ['Time', 'Location', 'Brand', 'Mood', 'Sentiment', 'Platform', 'Text']
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
         
         # Location summary
         with st.expander("📊 Location Summary"):
             location_summary = df.groupby('location').agg({
                 'mood': lambda x: x.mode()[0] if len(x) > 0 else 'Neutral',
                 'sentiment': lambda x: (x == 'Positive').mean() * 100,
-                'brand': 'nunique'
+                'brand': 'nunique',
+                'platform': 'nunique'
             }).round(2)
-            location_summary.columns = ['Dominant Mood', 'Positive Rate %', 'Unique Brands']
+            location_summary.columns = ['Dominant Mood', 'Positive Rate %', 'Unique Brands', 'Unique Platforms']
             st.dataframe(location_summary, use_container_width=True)
     
     else:
         st.warning("""
         🐑 No data available! 
         
-        Click **'Load Demo Data'** in the sidebar to start with geospatial data.
+        **Search for a brand** in the sidebar, or click **'Load Demo Data'** to start with geospatial data.
         This will generate realistic data with locations across Uganda.
         """)
 
