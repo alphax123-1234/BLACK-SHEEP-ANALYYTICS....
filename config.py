@@ -1,17 +1,19 @@
-
+"""
 #🐑 BLACK SHEEP - Configuration Management
+"""
 
 import os
 import logging
 from typing import Dict, Any
 from pathlib import Path
 
-# Set up logging configuration
+# Set up logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - 🐑 %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
 
 class Config:
     """
@@ -42,11 +44,23 @@ class Config:
     SCRAPE_DELAY_MIN = 1.0
     SCRAPE_DELAY_MAX = 3.0
     
+    # API Keys for multi-platform data
+    YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY', '')
+    TRENDS_API_KEY = os.getenv('TRENDS_API_KEY', '')
+    JUCIER_API_KEY = os.getenv('JUCIER_API_KEY', '')
+    
     # Create data directory if it doesn't exist
     DATA_DIR.mkdir(exist_ok=True)
     
     @classmethod
     def get_db_url(cls) -> str:
+        """Generate PostgreSQL connection URL"""
+        # Check if DATABASE_URL is set directly (Streamlit Cloud)
+        db_url = os.getenv('DATABASE_URL')
+        if db_url:
+            return db_url
+        
+        # Otherwise build from individual components
         return (
             f"postgresql://{cls.DB_CONFIG['user']}:{cls.DB_CONFIG['password']}"
             f"@{cls.DB_CONFIG['host']}:{cls.DB_CONFIG['port']}/{cls.DB_CONFIG['database']}"
@@ -54,10 +68,12 @@ class Config:
     
     @classmethod
     def is_production(cls) -> bool:
+        """Check if running in production"""
         return os.getenv('ENVIRONMENT', 'development') == 'production'
     
     @classmethod
     def validate_config(cls) -> bool:
+        """Validate configuration"""
         if cls.DB_CONFIG['host'] == 'localhost':
             logger.warning("🐑 Using local database configuration")
             return True
