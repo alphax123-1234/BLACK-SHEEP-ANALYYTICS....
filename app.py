@@ -1,5 +1,3 @@
-
-
 """
 🐑 BLACK SHEEP - Main Dashboard with Uganda Map
 """
@@ -8,6 +6,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
+from streamlit_folium import st_folium  # ← FIX 1: ADD THIS IMPORT!
 
 from database import DatabaseController
 from nlp_engine import UgandanNLPEngine
@@ -20,7 +19,9 @@ st.set_page_config(
     page_title="🐑 BLACK SHEEP - Uganda Map Insights",
     page_icon="🐑",
     layout="wide"
-)# Custom CSS
+)
+
+# Custom CSS
 st.markdown("""
 <style>
     .main-header {
@@ -53,9 +54,15 @@ def initialize_engine():
 
 @st.cache_resource
 def initialize_database():
+    """Initialize database with graceful fallback"""
     db = DatabaseController()
-    db.connect()
-    db.create_table()
+    try:
+        db.connect()
+        db.create_table()
+        st.sidebar.success("✅ Connected to cloud database")
+    except Exception as e:
+        st.sidebar.warning("⚠️ Using local CSV fallback")
+        st.sidebar.info("💡 Add DATABASE_URL secret to use cloud storage")
     return db
 
 @st.cache_resource
@@ -182,7 +189,7 @@ def main():
             st.caption("Hover over markers for details, colors represent moods")
             
             folium_map = map_visualizer.create_folium_map(df)
-            st_folium(folium_map, width=700, height=500)
+            st_folium(folium_map, width=700, height=500)  # ← NOW WORKS!
         
         with col2:
             st.subheader("📊 Mood Distribution")
