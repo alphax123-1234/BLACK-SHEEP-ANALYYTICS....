@@ -182,134 +182,36 @@ def main():
         df = df[df['mood'] == mood_filter]
     
     # Display metrics
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        st.metric("📊 Total Insights", len(df))
-    with col2:
-        if not df.empty:
-            moods = df['mood'].value_counts()
-            top_mood = moods.index[0] if len(moods) > 0 else "None"
-            st.metric("😊 Top Mood", top_mood)
-        else:
-            st.metric("😊 Top Mood", "None")
-    with col3:
-        if not df.empty:
-            locations = df['location'].nunique()
-            st.metric("📍 Active Locations", locations)
-        else:
-            st.metric("📍 Active Locations", 0)
-    with col4:
-        if not df.empty:
-            positive_rate = (len(df[df['sentiment'] == 'Positive']) / len(df)) * 100
-            st.metric("✅ Positivity Rate", f"{positive_rate:.1f}%")
-        else:
-            st.metric("✅ Positivity Rate", "0%")
-    with col5:
-        if not df.empty:
-            platforms = df['platform'].nunique()
-            st.metric("📱 Platforms", platforms)
-        else:
-            st.metric("📱 Platforms", 0)
-    
-    if not df.empty:
-        # Platform breakdown
-        st.subheader("📱 Platform Traffic")
-        platform_counts = df['platform'].value_counts()
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            fig = px.pie(
-                values=platform_counts.values,
-                names=platform_counts.index,
-                title="Data Source Breakdown"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        with col2:
-            st.bar_chart(platform_counts)
-        
-        # Two-column layout for maps
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            st.subheader("🗺️ Interactive Uganda Map")
-            st.caption("Hover over markers for details, colors represent moods")
-            
-            folium_map = map_visualizer.create_folium_map(df)
-            st_folium(folium_map, width=700, height=500)
-        
-        with col2:
-            st.subheader("📊 Mood Distribution")
-            
-            mood_counts = df['mood'].value_counts()
-            fig = px.pie(
-                values=mood_counts.values,
-                names=mood_counts.index,
-                color=mood_counts.index,
-                color_discrete_map=UgandaMapVisualizer().mood_colors,
-                hole=0.3
-            )
-            fig.update_layout(height=300, margin=dict(t=0, b=0, l=0, r=0))
-            st.plotly_chart(fig, use_container_width=True)
-            
-            st.subheader("📈 Sentiment by Brand")
-            brand_sentiment = df.groupby(['brand', 'sentiment']).size().unstack(fill_value=0)
-            fig = px.bar(
-                brand_sentiment,
-                barmode='group',
-                color_discrete_map={
-                    'Positive': '#2ecc71',
-                    'Neutral': '#95a5a6',
-                    'Negative': '#e74c3c'
-                }
-            )
-            fig.update_layout(height=250, margin=dict(t=0, b=0, l=0, r=0))
-            st.plotly_chart(fig, use_container_width=True)
-        
-        # Sentiment by platform
-        st.subheader("📊 Sentiment by Platform")
-        sentiment_by_platform = df.groupby(['platform', 'sentiment']).size().unstack(fill_value=0)
-        fig = px.bar(
-            sentiment_by_platform,
-            barmode='group',
-            title="Sentiment Distribution by Platform",
-            color_discrete_map={
-                'Positive': '#2ecc71',
-                'Neutral': '#95a5a6',
-                'Negative': '#e74c3c'
-            }
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Advanced map with Plotly
-        st.subheader("🗺️ Advanced Sentiment Map")
-        plotly_map = map_visualizer.create_plotly_map(df)
-        st.plotly_chart(plotly_map, use_container_width=True)
-        
-        # Recent insights
-        st.subheader("📝 Recent Insights by Location")
-        display_cols = ['timestamp', 'location', 'brand', 'mood', 'sentiment', 'platform', 'anonymized_text']
-        if all(col in df.columns for col in display_cols):
-            display_df = df[display_cols].head(10)
-            display_df.columns = ['Time', 'Location', 'Brand', 'Mood', 'Sentiment', 'Platform', 'Text']
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
-        
-        # Location summary
-        with st.expander("📊 Location Summary"):
-            location_summary = df.groupby('location').agg({
-                'mood': lambda x: x.mode()[0] if len(x) > 0 else 'Neutral',
-                'sentiment': lambda x: (x == 'Positive').mean() * 100,
-                'brand': 'nunique',
-                'platform': 'nunique'
-            }).round(2)
-            location_summary.columns = ['Dominant Mood', 'Positive Rate %', 'Unique Brands', 'Unique Platforms']
-            st.dataframe(location_summary, use_container_width=True)
-    
-    else:
-        st.warning("""
-        🐑 No data available! 
-        
-        **Search for a brand** in the sidebar, or click **'Load Demo Data'** to start with geospatial data.
-        This will generate realistic data with locations across Uganda.
-        """)
+col1, col2, col3, col4, col5 = st.columns(5)
 
-if __name__ == "__main__":
-    main()
+with col1:
+    st.metric("📊 Total Insights", len(df))
+
+with col2:
+    if not df.empty:
+        moods = df['mood'].value_counts()
+        top_mood = moods.index[0] if len(moods) > 0 else "None"
+        st.metric("😊 Top Mood", top_mood)
+    else:
+        st.metric("😊 Top Mood", "None")
+
+with col3:
+    if not df.empty:
+        locations = df['location'].nunique()
+        st.metric("📍 Active Locations", locations)
+    else:
+        st.metric("📍 Active Locations", 0)
+
+with col4:
+    if not df.empty:
+        positive_rate = (len(df[df['sentiment'] == 'Positive']) / len(df)) * 100
+        st.metric("✅ Positivity Rate", f"{positive_rate:.1f}%")
+    else:
+        st.metric("✅ Positivity Rate", "0%")
+
+with col5:
+    if not df.empty and 'platform' in df.columns:
+        platforms = df['platform'].nunique()
+        st.metric("📱 Platforms", platforms)
+    else:
+        st.metric("📱 Platforms", 0)
