@@ -1,5 +1,5 @@
 """
-🐑 BLACK SHEEP - Uganda Map Visualization (Locked Version)
+🐑 BLACK SHEEP - Uganda Map Visualization
 """
 
 import streamlit as st
@@ -10,14 +10,13 @@ from plotly.subplots import make_subplots
 import folium
 from streamlit_folium import st_folium
 
+
 class UgandaMapVisualizer:
     """
     Interactive map visualization for Uganda sentiment data
-    LOCKED on Uganda - no panning away!
     """
     
     def __init__(self):
-        # Uganda center coordinates
         self.uganda_center = [1.3733, 32.2903]
         
         # Uganda bounds (limits where you can pan)
@@ -26,7 +25,6 @@ class UgandaMapVisualizer:
             [5.0, 36.0]     # Northeast
         ]
         
-        # Color mapping for moods
         self.mood_colors = {
             'Happy': '#2ecc71',
             'Excited': '#f1c40f',
@@ -36,7 +34,6 @@ class UgandaMapVisualizer:
             'Sad': '#3498db'
         }
         
-        # Sentiment colors
         self.sentiment_colors = {
             'Positive': '#2ecc71',
             'Neutral': '#95a5a6',
@@ -44,40 +41,29 @@ class UgandaMapVisualizer:
         }
     
     def create_folium_map(self, df: pd.DataFrame) -> folium.Map:
-        """
-        Create interactive Folium map - LOCKED on Uganda
-        """
-        # Create base map with Uganda locked
+        """Create interactive Folium map with sentiment markers - LOCKED ON UGANDA"""
+        
+        # Create base map - LOCKED on Uganda
         m = folium.Map(
             location=self.uganda_center,
             zoom_start=7,
             tiles='OpenStreetMap',
-            min_zoom=5,          # Can't zoom out too far
-            max_zoom=12,         # Can't zoom in too far
-            max_bounds=True      # Prevents panning away
+            min_zoom=5,
+            max_zoom=12,
+            max_bounds=True,
+            zoom_control=True,
+            scrollWheelZoom=True
         )
         
-        # Lock map boundaries to Uganda region
+        # Lock map to Uganda region
         m.fit_bounds(self.uganda_bounds)
         
         if df.empty:
-            # Show Uganda overlay
             folium.Marker(
                 self.uganda_center,
                 popup="🐑 BLACK SHEEP\nLoading data...",
                 icon=folium.Icon(color='gray', icon='info-sign')
             ).add_to(m)
-            
-            # Add a circle around Uganda
-            folium.Circle(
-                self.uganda_center,
-                radius=200000,  # 200km
-                color='blue',
-                fill=True,
-                fillOpacity=0.1,
-                popup="Uganda\nWaiting for data..."
-            ).add_to(m)
-            
             return m
         
         # Group by location for aggregated markers
@@ -108,23 +94,6 @@ class UgandaMapVisualizer:
                 popup=folium.Popup(popup_text, max_width=300),
                 icon=folium.Icon(color=self._get_folium_color(color), icon='info-sign')
             ).add_to(m)
-            
-            # Add circle for sentiment radius
-            sentiment_counts = df[df['location'] == row['location']]['sentiment'].value_counts()
-            total = len(df[df['location'] == row['location']])
-            
-            if total > 0:
-                positive_ratio = sentiment_counts.get('Positive', 0) / total
-                radius = 5000 + (positive_ratio * 15000)
-                
-                folium.Circle(
-                    [row['latitude'], row['longitude']],
-                    radius=radius,
-                    color=color,
-                    fill=True,
-                    fillOpacity=0.3,
-                    popup=f"Positive ratio: {positive_ratio:.1%}"
-                ).add_to(m)
         
         return m
     
@@ -141,9 +110,8 @@ class UgandaMapVisualizer:
         return color_map.get(hex_color, 'gray')
     
     def create_plotly_map(self, df: pd.DataFrame) -> go.Figure:
-        """
-        Create Plotly map - LOCKED on Uganda
-        """
+        """Create Plotly map - LOCKED on Uganda"""
+        
         if df.empty:
             fig = go.Figure()
             fig.add_annotation(
@@ -157,7 +125,7 @@ class UgandaMapVisualizer:
                     scope='africa',
                     center=dict(lon=32.2903, lat=1.3733),
                     projection_type='mercator',
-                    projection_scale=5,  # Zooms in on Uganda
+                    projection_scale=5,
                     showland=True,
                     landcolor='lightgray',
                     showocean=True,
@@ -179,7 +147,6 @@ class UgandaMapVisualizer:
             subplot_titles=('Sentiment Map of Uganda', 'Mood Distribution', 'Brand Sentiment')
         )
         
-        # Map scatter plot - LOCKED on Uganda
         mood_colors = df['mood'].map(self.mood_colors)
         
         fig.add_trace(
@@ -187,7 +154,7 @@ class UgandaMapVisualizer:
                 lon=df['longitude'],
                 lat=df['latitude'],
                 text=df['location'] + '<br>' + df['brand'] + '<br>' + df['mood'],
-                mode='markers+text',
+                mode='markers',
                 marker=dict(
                     size=15,
                     color=mood_colors,
@@ -201,7 +168,6 @@ class UgandaMapVisualizer:
             row=1, col=1
         )
         
-        # Mood distribution bar chart
         mood_counts = df['mood'].value_counts()
         fig.add_trace(
             go.Bar(
@@ -213,7 +179,6 @@ class UgandaMapVisualizer:
             row=1, col=2
         )
         
-        # Brand sentiment bar chart
         brand_sentiment = df.groupby(['brand', 'sentiment']).size().unstack(fill_value=0)
         for sentiment in brand_sentiment.columns:
             fig.add_trace(
@@ -226,12 +191,11 @@ class UgandaMapVisualizer:
                 row=2, col=2
             )
         
-        # Lock map on Uganda
         fig.update_geos(
             scope='africa',
             center=dict(lon=32.2903, lat=1.3733),
             projection_type='mercator',
-            projection_scale=5,  # Zoom in on Uganda
+            projection_scale=5,
             showland=True,
             landcolor='lightgray',
             showocean=True,
