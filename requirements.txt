@@ -1,3 +1,4 @@
+# Core dependencies
 streamlit
 pandas
 psycopg2-binary
@@ -5,8 +6,15 @@ requests
 beautifulsoup4
 plotly
 python-dotenv
+
+# Geospatial and visualization
 folium
 streamlit-folium
 plotly-geo
 pydeck
+
+# Additional utilities
 numpy
+
+# Multi-platform data collection (NEW)
+google-api-python-client
