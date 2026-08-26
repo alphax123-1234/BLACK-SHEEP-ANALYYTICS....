@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS black_sheep_insights (
     location VARCHAR(100),
     latitude FLOAT,
     longitude FLOAT,
+    platform VARCHAR(50),
+    search_query VARCHAR(100),
     weather_condition VARCHAR(50),
     weather_temperature FLOAT,
     confidence_score FLOAT DEFAULT 0.0,
@@ -40,9 +42,10 @@ CREATE INDEX IF NOT EXISTS idx_black_sheep_timestamp ON black_sheep_insights(tim
 CREATE INDEX IF NOT EXISTS idx_black_sheep_sentiment ON black_sheep_insights(sentiment);
 CREATE INDEX IF NOT EXISTS idx_black_sheep_mood ON black_sheep_insights(mood);
 CREATE INDEX IF NOT EXISTS idx_black_sheep_location ON black_sheep_insights(location);
-CREATE INDEX IF NOT EXISTS idx_black_sheep_brand_sentiment ON black_sheep_insights(brand, sentiment);
-CREATE INDEX IF NOT EXISTS idx_black_sheep_coordinates ON black_sheep_insights(latitude, longitude);
+CREATE INDEX IF NOT EXISTS idx_black_sheep_platform ON black_sheep_insights(platform);
+CREATE INDEX IF NOT EXISTS idx_black_sheep_search_query ON black_sheep_insights(search_query);
 """
+
 
 class DatabaseController:
     """
@@ -62,7 +65,8 @@ class DatabaseController:
             df = pd.DataFrame(columns=[
                 'uuid', 'timestamp', 'brand', 'sentiment', 'mood',
                 'core_issue', 'anonymized_text', 'category', 'location',
-                'latitude', 'longitude', 'weather_condition', 'weather_temperature'
+                'latitude', 'longitude', 'platform', 'search_query',
+                'weather_condition', 'weather_temperature'
             ])
             df.to_csv(self.csv_path, index=False)
             logger.info(f"Created CSV storage at {self.csv_path}")
@@ -116,17 +120,19 @@ class DatabaseController:
         INSERT INTO black_sheep_insights 
         (uuid, timestamp, brand, sentiment, mood, core_issue, 
          anonymized_text, category, location, latitude, longitude,
-         weather_condition, weather_temperature)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+         platform, search_query, weather_condition, weather_temperature)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         
         saved_count = 0
         try:
             with self.connection.cursor() as cursor:
                 for insight in insights:
-                    record_uuid = str(uuid.uuid4())
+                    # Generate UUID if not present
+                    insight_uuid = getattr(insight, 'uuid', None) or str(uuid.uuid4())
+                    
                     values = (
-                        record_uuid,
+                        insight_uuid,
                         insight.timestamp,
                         insight.brand,
                         insight.sentiment,
@@ -137,8 +143,10 @@ class DatabaseController:
                         insight.location,
                         insight.latitude,
                         insight.longitude,
-                        insight.weather_condition,
-                        insight.weather_temperature
+                        getattr(insight, 'platform', None),
+                        getattr(insight, 'search_query', None),
+                        getattr(insight, 'weather_condition', None),
+                        getattr(insight, 'weather_temperature', 0.0)
                     )
                     cursor.execute(insert_query, values)
                     saved_count += 1
@@ -172,8 +180,10 @@ class DatabaseController:
                     'location': insight.location,
                     'latitude': insight.latitude,
                     'longitude': insight.longitude,
-                    'weather_condition': insight.weather_condition,
-                    'weather_temperature': insight.weather_temperature
+                    'platform': getattr(insight, 'platform', None),
+                    'search_query': getattr(insight, 'search_query', None),
+                    'weather_condition': getattr(insight, 'weather_condition', None),
+                    'weather_temperature': getattr(insight, 'weather_temperature', 0.0)
                 })
             
             df_new = pd.DataFrame(data)
@@ -212,6 +222,8 @@ class DatabaseController:
     
     def query_insights(self, brand: Optional[str] = None, 
                        sentiment: Optional[str] = None,
+                       platform: Optional[str] = None,
+                       search_query: Optional[str] = None,
                        limit: int = 100) -> pd.DataFrame:
         """Query insights from database or CSV fallback"""
         if self.is_connected or self.connect():
@@ -225,6 +237,12 @@ class DatabaseController:
                 if sentiment:
                     query += " AND sentiment = %s"
                     params.append(sentiment)
+                if platform:
+                    query += " AND platform = %s"
+                    params.append(platform)
+                if search_query:
+                    query += " AND search_query = %s"
+                    params.append(search_query)
                     
                 query += " ORDER BY timestamp DESC LIMIT %s"
                 params.append(limit)
@@ -242,6 +260,10 @@ class DatabaseController:
                     df = df[df['brand'] == brand]
                 if sentiment:
                     df = df[df['sentiment'] == sentiment]
+                if platform:
+                    df = df[df['platform'] == platform]
+                if search_query:
+                    df = df[df['search_query'] == search_query]
                 return df.head(limit)
             else:
                 return pd.DataFrame()
