@@ -11,6 +11,7 @@ import random
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class SocialInsight:
     """
@@ -26,6 +27,8 @@ class SocialInsight:
     location: str
     latitude: float
     longitude: float
+    platform: Optional[str] = None
+    search_query: Optional[str] = None
     weather_condition: str = ""
     weather_temperature: float = 0.0
     
@@ -203,7 +206,9 @@ class UgandanNLPEngine:
         text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL]', text)
         return text
     
-    def process_text(self, text: str, timestamp: Optional[datetime] = None) -> SocialInsight:
+    def process_text(self, text: str, timestamp: Optional[datetime] = None, 
+                     platform: Optional[str] = None, 
+                     search_query: Optional[str] = None) -> SocialInsight:
         """Full pipeline: process raw text into structured SocialInsight"""
         if timestamp is None:
             timestamp = datetime.now()
@@ -227,6 +232,17 @@ class UgandanNLPEngine:
             location=district,
             latitude=lat,
             longitude=lon,
+            platform=platform,
+            search_query=search_query,
             weather_condition="",
             weather_temperature=0.0
         )
+    
+    def process_batch(self, texts: List[str], platform: Optional[str] = None,
+                      search_query: Optional[str] = None) -> List[SocialInsight]:
+        """Process multiple texts efficiently"""
+        insights = []
+        for text in texts:
+            insight = self.process_text(text, platform=platform, search_query=search_query)
+            insights.append(insight)
+        return insights
